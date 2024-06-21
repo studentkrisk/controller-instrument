@@ -28,7 +28,11 @@ with mido.open_output('Controller MIDI Controller', virtual=True) as out:
         "RB": 0,
         "LT": 0,
         "RT": 0,
+        "RS": 0,
+        "LS": 0,
+        "SEL": 0
     }
+    trans = 0
     while True:
         report = gamepad.read(64)
         if not report:
@@ -45,15 +49,33 @@ with mido.open_output('Controller MIDI Controller', virtual=True) as out:
             "RB": (report[3] & 2**3) >> 3,
             "LB": (report[3] & 2**2) >> 2,
             "RT": (report[3] & 2**1) >> 1,
-            "LT": report[3] & 2**0
+            "LT": report[3] & 2**0,
+            "RS": (report[2] & 2**2) >> 2,
+            "LS": (report[2] & 2**1) >> 1,
+            "SEL": report[2] & 2**0
         }
         print(state)
-
         for btn in notes.keys():
             if state[btn] and not last_state[btn]:
-                out.send(mido.Message("note_on", note=notes[btn] - 12*state["LB"] + 12*state["RB"] - state["LT"] + state["RT"]))
+                out.send(mido.Message("note_on", note=notes[btn] - 12*state["LB"] + 12*state["RB"] - state["LT"] + state["RT"] + trans))
             if not state[btn] and last_state[btn]:
-                out.send(mido.Message("note_off", note=notes[btn] - 12*state["LB"] + 12*state["RB"] - state["LT"] + state["RT"]))
+                out.send(mido.Message("note_off", note=trans + notes[btn] - 12 - 1))
+                out.send(mido.Message("note_off", note=trans + notes[btn] + 12 - 1))
+                out.send(mido.Message("note_off", note=trans + notes[btn]      - 1))
+                out.send(mido.Message("note_off", note=trans + notes[btn] - 12    ))
+                out.send(mido.Message("note_off", note=trans + notes[btn]         ))
+                out.send(mido.Message("note_off", note=trans + notes[btn] + 12    ))
+                out.send(mido.Message("note_off", note=trans + notes[btn] - 12 + 1))
+                out.send(mido.Message("note_off", note=trans + notes[btn]      + 1))
+                out.send(mido.Message("note_off", note=trans + notes[btn] + 12 + 1))
+        if state["LS"] and not last_state["LS"]:
+            trans -= 1
+        if state["RS"] and not last_state["RS"]:
+            trans += 1
+        if state["SEL"]:
+            for i in range(60 - 12 - 1, 60 + 12 + 1 + 1):
+                out.send(mido.Message("note_off", note=i))
+            trans = 0
 
         last_state = state
 
